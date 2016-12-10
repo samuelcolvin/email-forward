@@ -28,7 +28,7 @@ postconf -e smtpd_helo_required=yes
 postconf -e "smtpd_helo_restrictions=reject_unknown_sender_domain,reject_invalid_helo_hostname,permit"
 
 # domains for which postfix is going to accept emails
-postconf -e "virtual_alias_domains=scolvin.com muelcolvin.com gaugemore.com"
+postconf -e "virtual_alias_domains=scolvin.com muelcolvin.com gaugemore.com helpmanual.io"
 postconf -e virtual_alias_maps=hash:/etc/postfix/virtual
 
 postmap /etc/postfix/virtual

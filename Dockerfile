@@ -11,5 +11,7 @@ RUN chmod +x /run.sh
 
 USER root
 
+EXPOSE 25
+EXPOSE 465
 EXPOSE 587
 ENTRYPOINT ["/run.sh"]

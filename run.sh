@@ -31,10 +31,11 @@ postconf -e "smtpd_helo_restrictions=reject_unknown_sender_domain,reject_invalid
 postconf -e "virtual_alias_domains=scolvin.com muelcolvin.com gaugemore.com helpmanual.io"
 postconf -e virtual_alias_maps=hash:/etc/postfix/virtual
 
-postmap /etc/postfix/virtual
+# force encryption
+postconf -e smtp_tls_security_level=encrypt
+postconf -e smtp_enforce_tls=yes
 
-# Use 587 (submission)
-sed -i -r -e 's/^#submission/submission/' /etc/postfix/master.cf
+postmap /etc/postfix/virtual
 
 #printf "\n\n# Postfix config:"
 #postconf

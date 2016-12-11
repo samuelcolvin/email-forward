@@ -1,5 +1,4 @@
 import smtplib
-import time
 
 from email.mime.text import MIMEText
 
@@ -8,10 +7,13 @@ msg['Subject'] = 'testing'
 msg['From'] = 'testing@gaugemore.com'
 msg['To'] = 'whatever@scolvin.com'
 
-with smtplib.SMTP('localhost', port=8587) as smtp:
+with smtplib.SMTP('mail.muelcolvin.com') as smtp:
     print('noop:', smtp.noop())
-    print('sleeping 1')
-    time.sleep(1)
     print('helo:', smtp.helo())
-    print('help:', smtp.help())
-    # s.send_message(msg)
+    print('mail:', smtp.mail('testing@testing.com'))
+    print('rcpt testing@scolvin.com:    ', smtp.rcpt('testing@scolvin.com'))
+    print('rcpt testing@muelcolvin.com: ', smtp.rcpt('testing@muelcolvin.com'))
+    print('rcpt testing@gaugemore.com:  ', smtp.rcpt('testing@gaugemore.com'))
+    print('rcpt testing@helpmanual.io:  ', smtp.rcpt('testing@helpmanual.io'))
+    print('rcpt testing@example.com:    ', smtp.rcpt('testing@example.com'))
+    # smtp.send_message(msg)

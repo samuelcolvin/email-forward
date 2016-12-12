@@ -47,10 +47,9 @@ postconf -e mydomain=muelcolvin.com
 
 postmap /etc/postfix/virtual
 
-printf "\n\n# Postfix config:\n==============================\n"
-postconf
-
-printf "==============================\n\n\n"
+#printf "\n\n# Postfix config:\n==============================\n"
+#postconf
+#printf "==============================\n\n\n"
 
 echo "starting postfix..."
 /usr/sbin/postfix -c /etc/postfix start

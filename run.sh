@@ -45,12 +45,21 @@ postconf -e smtp_enforce_tls=yes
 postconf -e myhostname=mail.muelcolvin.com
 postconf -e mydomain=muelcolvin.com
 
+# Add postfix configuration parameters for postsrsd
+postconf -e sender_canonical_maps=tcp:127.0.0.1:10001
+postconf -e sender_canonical_classes=envelope_sender
+postconf -e recipient_canonical_maps=tcp:127.0.0.1:10002
+postconf -e recipient_canonical_classes=envelope_recipient
+
+# set the postfix alias map
 postmap /etc/postfix/virtual
 
 #printf "\n\n# Postfix config:\n==============================\n"
 #postconf
 #printf "==============================\n\n\n"
 
+echo "starting postsrd..."
+postsrsd -d mail.muelcolvin.com -s /etc/postsrsd.secret &
 echo "starting postfix..."
 /usr/sbin/postfix -c /etc/postfix start
 echo "starting rsyslogd..."

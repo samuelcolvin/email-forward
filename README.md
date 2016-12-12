@@ -17,12 +17,15 @@ Modify then run the test script
     ./test.py
 
 
-You can then test with `python3 test.py`
+You can then test with `./test.py`
 
 # Deploying
 
 Roughly run
 
+    export AWS_ACCESS_KEY_ID="<your aws access key>"
+    export AWS_SECRET_ACCESS_KEY="<your aws secret key>"
+    export AWS_DEFAULT_REGION=eu-west=1
     ./create-iam-policy-logs.sh
     ./create-host.sh
     eval $(docker-machine env docker-postfix)

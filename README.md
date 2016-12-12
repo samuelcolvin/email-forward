@@ -2,6 +2,7 @@
 
 email forwarding with a tiny alpine linux docker image running postfix
 
+# Testing
 
 To build
 
@@ -13,3 +14,14 @@ To run locally
 
 
 You can then test with `python3 test.py`
+
+# Deploying
+
+Roughly run
+
+    ./create-iam-policy-logs.sh
+    ./create-host.sh
+    eval $(docker-machine env docker-postfix)
+    ./create-container.sh
+
+See those files for more details.

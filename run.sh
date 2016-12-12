@@ -2,7 +2,7 @@
 set -e
 
 _term() {
-  echo "received termination signal SIG$(kill -l $(($? - 128))), closing..."
+  echo "received termination signal, closing..."
   exit
 }
 
@@ -59,7 +59,8 @@ rsyslogd -n &
 echo "starting monitoring loop with 10 min heartbeat..."
 runcount=0
 while true; do
-  sleep 600
   runcount=$((runcount+1))
   echo "running $runcount"
+  top -n 1 -b | head
+  sleep 600
 done

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import smtplib
 
 from email.mime.text import MIMEText
@@ -7,7 +8,14 @@ msg['Subject'] = 'testing'
 msg['From'] = 'testing@gaugemore.com'
 msg['To'] = 'whatever@scolvin.com'
 
-with smtplib.SMTP('mail.muelcolvin.com') as smtp:
+host = 'mail.muelcolvin.com'
+port = 0  # default
+
+# when running locally:
+# host = 'localhost'
+# port = 8025
+
+with smtplib.SMTP(host, port) as smtp:
     print('noop:', smtp.noop())
     print('helo:', smtp.helo())
     print('mail:', smtp.mail('testing@testing.com'))

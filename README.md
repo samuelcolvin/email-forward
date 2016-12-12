@@ -10,7 +10,11 @@ To build
 
 To run locally
 
-    docker run -t -i --rm=true -p=8587:587 postfix-forward
+    docker run -t -i --rm=true -p=8025:25 postfix-forward
+    
+Modify then run the test script
+
+    ./test.py
 
 
 You can then test with `python3 test.py`

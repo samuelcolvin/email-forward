@@ -1,14 +1,20 @@
 #!/bin/bash
 set -e
 
-echo "starting..."
-
 _term() {
-  echo "received SIGTERM, closing"
-  kill -TERM "$child" 2>/dev/null
+  echo "received termination signal SIG$(kill -l $(($? - 128))), closing..."
+  exit
 }
 
-trap _term SIGTERM
+trap _term SIGTERM SIGINT
+
+echo "bash version:"
+bash --version
+
+echo "system version:"
+uname -a
+
+echo "settings up postfix..."
 
 # Disable SMTPUTF8, because libraries (ICU) are missing in alpine
 postconf -e smtputf8_enable=no
@@ -35,17 +41,26 @@ postconf -e virtual_alias_maps=hash:/etc/postfix/virtual
 postconf -e smtp_tls_security_level=encrypt
 postconf -e smtp_enforce_tls=yes
 
+# set host name and domain
+postconf -e myhostname=mail.muelcolvin.com
+postconf -e mydomain=muelcolvin.com
+
 postmap /etc/postfix/virtual
 
-#printf "\n\n# Postfix config:"
-#postconf
+printf "\n\n# Postfix config:\n==============================\n"
+postconf
+
+printf "==============================\n\n\n"
 
 echo "starting postfix..."
 /usr/sbin/postfix -c /etc/postfix start
 echo "starting rsyslogd..."
 rsyslogd -n &
 
-child=$!
-
-echo "waiting indefinitely for SIGTERM..."
-wait "$child"
+echo "starting monitoring loop with 10 min heartbeat..."
+runcount=0
+while true; do
+  sleep 600
+  runcount=$((runcount+1))
+  echo "running $runcount"
+done

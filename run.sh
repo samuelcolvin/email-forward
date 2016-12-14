@@ -8,6 +8,8 @@ _term() {
 
 trap _term SIGTERM SIGINT
 
+printf "\n\n\n=================== starting docker-postfix ===================\n"
+
 echo "bash version:"
 bash --version
 
@@ -58,18 +60,28 @@ postmap /etc/postfix/virtual
 #postconf
 #printf "==============================\n\n\n"
 
-echo "starting postsrd..."
+echo "(re)starting postsrd..."
+killall postsrsd 2>/dev/null || true
 postsrsd -d mail.muelcolvin.com -s /etc/postsrsd.secret &
-echo "starting postfix..."
-/usr/sbin/postfix -c /etc/postfix start
-echo "starting rsyslogd..."
+
+echo "(re)starting postfix..."
+postfix stop 2>/dev/null || true
+postfix -c /etc/postfix start
+postfix status
+
+echo "(re)starting rsyslogd..."
+# try deleting the pid and killing rsyslogd in case it was started before
+rm /var/run/rsyslogd.pid 2>/dev/null || true
+killall rsyslogd 2>/dev/null || true
 rsyslogd -n &
 
-echo "starting monitoring loop with 10 min heartbeat..."
+sleep_time=600
+echo "starting monitoring loop with $((sleep_time / 60)) min heartbeat..."
 runcount=0
 while true; do
   runcount=$((runcount+1))
   echo "running $runcount"
   top -n 1 -b | head
-  sleep 600
+  sleep $sleep_time &
+  wait $!
 done

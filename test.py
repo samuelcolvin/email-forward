@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import smtplib
+import sys
 
 from email.mime.text import MIMEText
 
@@ -11,9 +12,10 @@ msg['To'] = 'whatever@scolvin.com'
 host = 'mail.muelcolvin.com'
 port = 0  # default
 
-# when running locally:
-# host = 'localhost'
-# port = 8025
+if 'local' in sys.argv:
+    print('checking local container')
+    host = 'localhost'
+    port = 8025
 
 with smtplib.SMTP(host, port) as smtp:
     print('noop:', smtp.noop())

@@ -10,11 +10,9 @@ trap _term SIGTERM SIGINT
 
 printf "\n\n\n=================== starting docker-postfix ===================\n"
 
-echo "bash version:"
-bash --version
+echo "bash --version: $(bash --version)"
 
-echo "system version:"
-uname -a
+echo "uname -a: $(uname -a)"
 
 echo "settings up postfix..."
 
@@ -53,6 +51,13 @@ postconf -e sender_canonical_classes=envelope_sender
 postconf -e recipient_canonical_maps=tcp:127.0.0.1:10002
 postconf -e recipient_canonical_classes=envelope_recipient
 
+# postfix queue settings
+postconf -e maximal_queue_lifetime=4h
+postconf -e bounce_queue_lifetime=4h
+postconf -e minimal_backoff_time=55m
+postconf -e maximal_backoff_time=70m
+postconf -e queue_run_delay=5m
+
 # set the postfix alias map
 postmap /etc/postfix/virtual
 
@@ -82,6 +87,7 @@ while true; do
   runcount=$((runcount+1))
   echo "running $runcount"
   top -n 1 -b | head
+  postqueue -p
   sleep $sleep_time &
   wait $!
 done

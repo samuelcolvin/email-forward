@@ -85,9 +85,8 @@ echo "starting monitoring loop with $((sleep_time / 60)) min heartbeat..."
 runcount=0
 while true; do
   runcount=$((runcount+1))
-  echo "running $runcount"
-  top -n 1 -b | head
-  postqueue -p
+  /memory-json.sh $runcount
+  postqueue -j
   sleep $sleep_time &
   wait $!
 done

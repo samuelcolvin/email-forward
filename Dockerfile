@@ -18,6 +18,10 @@ RUN build_packages="wget build-base linux-headers cmake" \
 
 COPY rsyslog.conf /etc/rsyslog.conf
 COPY postfix_virtual /etc/postfix/virtual
+
+COPY memory-json.sh /memory-json.sh
+RUN chmod +x /memory-json.sh
+
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
 

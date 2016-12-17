@@ -4,7 +4,7 @@ import smtplib
 import sys
 from email.mime.text import MIMEText
 
-host = os.environ['MY_DOMAIN']
+host = 'mail.{}'.format(os.environ['MY_DOMAIN'])
 port = 0  # default
 
 if 'local' in sys.argv:
@@ -19,6 +19,7 @@ msg['Subject'] = 'testing'
 msg['From'] = 'testing@testing.com'
 msg['To'] = 'whatever@{}'.format(domains[0])
 
+print('connecting to "{}"...'.format(host))
 with smtplib.SMTP(host, port) as smtp:
     print('noop:', smtp.noop())
     print('helo:', smtp.helo())

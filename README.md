@@ -1,6 +1,11 @@
 # docker-postfix-forward
 
-email forwarding with a tiny alpine linux docker image running postfix.
+Email forwarding with a tiny alpine linux docker image running postfix.
+
+Logs are sent to CloudWatch using dockers log drivers so you have a record of email activity.
+ 
+I use this image to forward emails from domains I own to my gmail inbox, running on a t2.nano instance it 
+costs $4.60/mo all in.
 
 ## Settings
 
@@ -32,6 +37,8 @@ Log into AWS, then:
 
 You'll need to run `docker-machine regenerate-certs docker-postfix` once you assign the new ip.
 
+Set up your DNS to point to `mail.<mydomain>` where `<mydomain>` is the domain you set in `env.sh`.
+
 You should then be able to test with
 
     ./test.py
@@ -39,6 +46,6 @@ You should then be able to test with
 ## Building
 
 (This isn't generally necessary as the docker image is available at 
-[samuelcolvin/docker-postfix-forward](https://hub.docker.com/r/samuelcolvin/docker-postfix-forward/)).
+[samuelcolvin/postfix-forward](https://hub.docker.com/r/samuelcolvin/postfix-forward/)).
 
     docker build -t postfix-forward .

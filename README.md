@@ -10,10 +10,6 @@ To "activate" those settings run `eval $(cat env.sh)`.
 
 ## Testing
 
-To build
-
-    docker build -t postfix-forward .
-
 To run locally (with environment variables set):
 
     ./run-local.sh
@@ -39,3 +35,10 @@ You'll need to run `docker-machine regenerate-certs docker-postfix` once you ass
 You should then be able to test with
 
     ./test.py
+
+## Building
+
+(This isn't generally necessary as the docker image is available at 
+[samuelcolvin/docker-postfix-forward](https://hub.docker.com/r/samuelcolvin/docker-postfix-forward/)).
+
+    docker build -t postfix-forward .

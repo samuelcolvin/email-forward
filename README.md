@@ -1,34 +1,39 @@
 # docker-postfix-forward
 
-email forwarding with a tiny alpine linux docker image running postfix
+email forwarding with a tiny alpine linux docker image running postfix.
 
-# Testing
+## Settings
+
+Copy `env.sh.template` to `env.sh` and configure the settings.
+
+To "activate" those settings run `eval $(cat env.sh)`.
+
+## Testing
 
 To build
 
     docker build -t postfix-forward .
 
-To run locally
+To run locally (with environment variables set):
 
     docker run -t -i --rm=true -p=8025:25 postfix-forward
-    
-Modify then run the test script
 
-    ./test.py
+You can then test with `./test.py local`
 
-
-You can then test with `./test.py`
-
-# Deploying
+## Deploying
 
 Roughly run
 
-    export AWS_ACCESS_KEY_ID="<your aws access key>"
-    export AWS_SECRET_ACCESS_KEY="<your aws secret key>"
-    export AWS_DEFAULT_REGION=eu-west=1
+    eval $(cat env.sh)
     ./create-iam-policy-logs.sh
     ./create-host.sh
     eval $(docker-machine env docker-postfix)
     ./create-container.sh
 
-See those files for more details.
+Log into AWS, then:
+* go to ec2 > "Security Groups" and add ports 25, 465, 587 to the "docker-machine" secuity group.
+* go to ec2 > "Elastic IPs", allocate a new ip and associate it with the "docker-postfix" instance.
+
+You'll need to run `docker-machine egenerate-certs docker-postfix` once you assign the new ip.
+
+You should 

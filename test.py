@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
+import os
 import smtplib
 import sys
-
 from email.mime.text import MIMEText
 
-msg = MIMEText('this is the message')
-msg['Subject'] = 'testing'
-msg['From'] = 'testing@gaugemore.com'
-msg['To'] = 'whatever@scolvin.com'
-
-host = 'mail.muelcolvin.com'
+host = os.environ['MY_DOMAIN']
 port = 0  # default
 
 if 'local' in sys.argv:
@@ -17,13 +12,18 @@ if 'local' in sys.argv:
     host = 'localhost'
     port = 8025
 
+domains = os.environ['FORWARDED_DOMAINS'].split(' ')
+
+msg = MIMEText('this is the message')
+msg['Subject'] = 'testing'
+msg['From'] = 'testing@testing.com'
+msg['To'] = 'whatever@{}'.format(domains[0])
+
 with smtplib.SMTP(host, port) as smtp:
     print('noop:', smtp.noop())
     print('helo:', smtp.helo())
     print('mail:', smtp.mail('testing@testing.com'))
-    print('rcpt testing@scolvin.com:    ', smtp.rcpt('testing@scolvin.com'))
-    print('rcpt testing@muelcolvin.com: ', smtp.rcpt('testing@muelcolvin.com'))
-    print('rcpt testing@gaugemore.com:  ', smtp.rcpt('testing@gaugemore.com'))
-    print('rcpt testing@helpmanual.io:  ', smtp.rcpt('testing@helpmanual.io'))
-    print('rcpt testing@example.com:    ', smtp.rcpt('testing@example.com'))
+    for domain in domains:
+        print('rcpt {} (should succeed):'.format(domain), smtp.rcpt('testing@{}'.format(domain)))
+    print('rcpt testing@example.com (should fail): ', smtp.rcpt('testing@example.com'))
     # smtp.send_message(msg)

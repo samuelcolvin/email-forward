@@ -16,13 +16,12 @@ RUN build_packages="wget build-base linux-headers cmake" \
  && rm -rf /tmp/* \
  && rm -rf /var/cache/apk/*
 
-COPY rsyslog.conf /etc/rsyslog.conf
-COPY postfix_virtual /etc/postfix/virtual
+COPY image/rsyslog.conf /etc/rsyslog.conf
 
-COPY memory-json.sh /memory-json.sh
+COPY image/memory-json.sh /memory-json.sh
 RUN chmod +x /memory-json.sh
 
-COPY run.sh /run.sh
+COPY image/run.sh /run.sh
 RUN chmod +x /run.sh
 
 USER root

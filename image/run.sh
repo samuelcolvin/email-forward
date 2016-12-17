@@ -42,8 +42,7 @@ postconf -e relay_domains=
 # Reject invalid HELOs
 postconf -e smtpd_delay_reject=yes
 postconf -e smtpd_helo_required=yes
-#postconf -e "smtpd_helo_restrictions=reject_unknown_sender_domain,eject_unknown_helo_hostname,reject_invalid_helo_hostname,permit"
-postconf -e "smtpd_helo_restrictions=reject_unknown_sender_domain,reject_invalid_helo_hostname,permit"
+postconf -e "smtpd_helo_restrictions=reject_unknown_sender_domain,reject_unknown_helo_hostname,reject_invalid_helo_hostname,permit"
 
 # create "/domains" and "/etc/postfix/virtual" to contain domain and alias information
 rm /etc/postfix/virtual 2>/dev/null || true

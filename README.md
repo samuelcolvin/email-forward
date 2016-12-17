@@ -16,9 +16,9 @@ To build
 
 To run locally (with environment variables set):
 
-    docker run -t -i --rm=true -p=8025:25 postfix-forward
+    ./run-local.sh
 
-You can then test with `./test.py local`
+You can then test by calling `eval $(cat env.sh); ./test.py local` in another terminal.
 
 ## Deploying
 
@@ -34,6 +34,8 @@ Log into AWS, then:
 * go to ec2 > "Security Groups" and add ports 25, 465, 587 to the "docker-machine" secuity group.
 * go to ec2 > "Elastic IPs", allocate a new ip and associate it with the "docker-postfix" instance.
 
-You'll need to run `docker-machine egenerate-certs docker-postfix` once you assign the new ip.
+You'll need to run `docker-machine regenerate-certs docker-postfix` once you assign the new ip.
 
-You should 
+You should then be able to test with
+
+    ./test.py

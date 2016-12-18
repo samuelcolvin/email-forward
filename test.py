@@ -26,5 +26,5 @@ with smtplib.SMTP(host, port) as smtp:
     print('mail:', smtp.mail('testing@testing.com'))
     for domain in domains:
         print('rcpt {} (should succeed):'.format(domain), smtp.rcpt('testing@{}'.format(domain)))
-    print('rcpt testing@example.com (should fail): ', smtp.rcpt('testing@example.com'))
+    print('rcpt example.com (should fail): ', smtp.rcpt('testing@example.com'))
     # smtp.send_message(msg)

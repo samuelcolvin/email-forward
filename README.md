@@ -25,7 +25,7 @@ You can then test by calling `eval $(cat env.sh); ./test.py local` in another te
 
 Roughly run
 
-    eval $(cat env.sh)
+    source ./env.sh
     ./create-iam-policy-logs.sh
     ./create-host.sh
     eval $(docker-machine env docker-postfix)

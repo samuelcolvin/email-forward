@@ -87,6 +87,7 @@ chown root:postfix /var/spool/postfix/pid
 #printf "\n\n# Postfix config:\n==============================\n"
 #postconf
 #printf "==============================\n\n\n"
+echo "Postfix version: `postconf -d | grep '^mail_version'`"
 
 echo "(re)starting postsrd..."
 killall postsrsd 2>/dev/null || true

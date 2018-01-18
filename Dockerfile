@@ -1,5 +1,6 @@
-FROM alpine:3.4
-MAINTAINER Samuel Colvin <s@muelcolvin.com>
+FROM alpine:3.7
+
+LABEL maintainer 's@muelcolvin.com'
 
 ENV POSTSRSD_VERSION 1.4
 RUN build_packages="wget build-base linux-headers cmake" \

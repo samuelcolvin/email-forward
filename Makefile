@@ -45,6 +45,7 @@ push: build
 	docker push samuelcolvin/email-forward
 
 .PHONY: deploy
+deploy: COMMIT=$(shell git rev-parse HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
 deploy:
 	docker pull samuelcolvin/email-forward:latest
 	docker stop email-forward && docker rm email-forward || true
@@ -57,6 +58,6 @@ deploy:
 		--log-driver=awslogs \
 		--log-opt awslogs-region=eu-west-1 \
 		--log-opt awslogs-group=EmailForward \
-		--log-opt awslogs-stream=email-forward \
+		--log-opt awslogs-stream="email-forward-$(COMMIT)" \
 		--name email-forward \
 		samuelcolvin/email-forward

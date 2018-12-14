@@ -10,7 +10,7 @@ if 'local' in sys.argv:
     port = 8025
 
 else:
-    host = 'mail.{}'.format(os.environ['MY_DOMAIN'])
+    host = os.environ['HOST_NAME']
     port = 0
 
 domains = os.environ['FORWARDED_DOMAINS'].split(' ')
@@ -25,7 +25,7 @@ with smtplib.SMTP(host, port) as smtp:
     print('noop:', smtp.noop())
     print('helo:', smtp.helo())
     # print('mail:', smtp.mail('testing@testing.com'))
-    # for domain in domains:
-    #     print('rcpt {} (should succeed):'.format(domain), smtp.rcpt('testing@{}'.format(domain)))
+    for domain in domains:
+        print('rcpt {} (should succeed):'.format(domain), smtp.rcpt('testing@{}'.format(domain)))
     print('rcpt example.com (should fail): ', smtp.rcpt('testing@example.com'))
     smtp.send_message(msg)

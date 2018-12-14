@@ -1,3 +1,0 @@
-hostname = 'smtp.example.com'
-forward_to = 'example@gmail.com'
-forwarded_domains = ['example.com']

@@ -7,10 +7,8 @@ FROM email-forward-base as base
 FROM python:3.7-alpine3.8
 
 ENV PYTHONUNBUFFERED 1
-ENV APP_ON_DOCKER 1
 WORKDIR /home/root
-RUN adduser -D runuser
-USER runuser
+USER root
 
 COPY --from=base /lib/* /lib/
 COPY --from=base /usr/lib/* /usr/lib/
@@ -20,7 +18,5 @@ ADD ./run.py /home/root
 
 ARG COMMIT
 ENV COMMIT $COMMIT
-ARG BUILD_TIME
-ENV BUILD_TIME $BUILD_TIME
 
 CMD ["./run.py"]

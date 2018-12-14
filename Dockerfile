@@ -1,33 +1,26 @@
-FROM alpine:3.7
+# ===============================================
+# pre-built python dependency stage
+FROM email-forward-base as base
 
-LABEL maintainer 's@muelcolvin.com'
+# ===============================================
+# final image
+FROM python:3.7-alpine3.8
 
-ENV POSTSRSD_VERSION 1.4
-RUN build_packages="wget build-base linux-headers cmake" \
- && runtime_packages="postfix ca-certificates rsyslog bash" \
- && apk --update --no-cache add ${build_packages} ${runtime_packages} \
- && cd /tmp \
- && wget https://github.com/roehling/postsrsd/archive/${POSTSRSD_VERSION}.zip -O postsrsd.zip \
- && unzip postsrsd.zip \
- && cd /tmp/postsrsd-${POSTSRSD_VERSION} \
- && make \
- && make install \
- && cd / \
- && apk del ${build_packages} \
- && rm -rf /tmp/* \
- && rm -rf /var/cache/apk/*
+ENV PYTHONUNBUFFERED 1
+ENV APP_ON_DOCKER 1
+WORKDIR /home/root
+RUN adduser -D runuser
+USER runuser
 
-COPY image/rsyslog.conf /etc/rsyslog.conf
+COPY --from=base /lib/* /lib/
+COPY --from=base /usr/lib/* /usr/lib/
+COPY --from=base /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7/site-packages
 
-COPY image/memory-json.sh /memory-json.sh
-RUN chmod +x /memory-json.sh
+ADD ./run.py /home/root
 
-COPY image/run.sh /run.sh
-RUN chmod +x /run.sh
+ARG COMMIT
+ENV COMMIT $COMMIT
+ARG BUILD_TIME
+ENV BUILD_TIME $BUILD_TIME
 
-USER root
-
-EXPOSE 25
-EXPOSE 465
-EXPOSE 587
-CMD ["/run.sh"]
+CMD ["./run.py"]

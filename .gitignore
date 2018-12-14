@@ -1,2 +1,4 @@
-.idea
+/.idea/
 env.sh
+/env/
+/config.toml

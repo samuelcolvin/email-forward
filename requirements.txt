@@ -1,0 +1,3 @@
+aiosmtpd==1.2
+devtools==0.3
+toml==0.10.0

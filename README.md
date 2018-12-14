@@ -1,4 +1,4 @@
-# docker-postfix-forward
+# email-forward
 
 Email forwarding with a tiny alpine linux docker image running postfix.
 

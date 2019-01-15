@@ -38,7 +38,7 @@ build:
 .PHONY: run-local
 build: C=$(shell git rev-parse HEAD)
 run-local: build
-	docker run -it --rm=true -p=8025:25 email-forward
+	docker run -it --rm=true -p=8025:25 -e "FORWARD_TO=$(FORWARD_TO)" samuelcolvin/email-forward
 
 .PHONY: push
 push: build

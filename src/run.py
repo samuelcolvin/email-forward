@@ -1,83 +1,71 @@
 #!/usr/bin/env python3.7
-import asyncio
-import logging
+import asyncore
 import os
-import re
+import logging
+import smtpd
 import smtplib
+import re
+import traceback
 
-import aiodns
-from aiosmtpd.controller import Controller
-from async_timeout import timeout
 
 import sentry_sdk
+from dns import resolver
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 logger = logging.getLogger('email-forward')
 logger.setLevel(logging.INFO)
-log_handler = logging.StreamHandler()
-log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-logger.addHandler(log_handler)
 
 sentry_logging = LoggingIntegration(
     level=logging.INFO,          # Capture info and above as breadcrumbs
     event_level=logging.WARNING  # Send errors as events
 )
-s = sentry_sdk.init(integrations=[sentry_logging])
+sentry_sdk.init(integrations=[sentry_logging])
 forward_to = os.environ['FORWARD_TO']
 _, forward_to_host = forward_to.split('@', 1)
-forward_port = 465
 
 
-class Handler:
-    def __init__(self):
-        self.resolver = aiodns.DNSResolver(nameservers=('1.1.1.1', '1.0.0.1'))
-
-    async def handle_DATA(self, server, session, envelope):
+class SMTPServer(smtpd.SMTPServer):
+    def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
         with sentry_sdk.configure_scope() as scope:
-            scope.set_extra('server', server)
-            scope.set_extra('session', session)
-            scope.set_extra('envelope', envelope)
+            scope.set_extra('peer', peer)
+            scope.set_extra('mailfrom', mailfrom)
+            scope.set_extra('rcpttos', rcpttos)
+            scope.set_extra('data', data)
+            scope.set_extra('kwargs', kwargs)
+            logger.info('forwarding "%s" > "%s"', mailfrom, rcpttos)
             try:
-                await self.forward_mail(session, envelope)
-            except Exception as exc:
-                logger.info('email from "%s" > %s, error: %s', envelope.mail_from, envelope.rcpt_tos, exc)
-                sentry_sdk.capture_exception(exc)
-            else:
-                logger.info('email from "%s" > %s', envelope.mail_from, envelope.rcpt_tos)
-            return '250 OK'
+                lines = data.splitlines(keepends=True)
+                # Look for the last header
+                i = 0
+                ending = b'\r\n'
+                for line in lines:
+                    if re.match(br'\r\n|\r|\n', line):
+                        ending = line
+                        break
+                    i += 1
+                peer = peer[0].encode('ascii')
+                lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
+                content = b''.join(lines)
+                self.deliver(mailfrom, content)
+            except Exception as e:
+                logger.warning('forwarding "%s" > "%s", error %s: %s', mailfrom, rcpttos, e.__class__.__name__, e)
+                sentry_sdk.capture_exception(e)
+                traceback.print_exc()
 
-    async def forward_mail(self, session, envelope):
-        content = envelope.content
-        lines = content.splitlines(keepends=True)
-        # Look for the last header
-        i = 0
-        ending = b'\r\n'
-        for line in lines:
-            if re.match(br'\r\n|\r|\n', line):
-                ending = line
-                break
-            i += 1
-        peer = session.peer[0].encode('ascii')
-        lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
-        content = b''.join(lines)
-
-        with timeout(2):
-            results = await self.resolver.query(forward_to_host, 'MX')
-        mx_hosts = [r[1] for r in sorted((r.priority, r.host) for r in results)]
-
-        with timeout(10):
-            await loop.run_in_executor(None, self.sendmail, mx_hosts, envelope.mail_from, content)
-
-    def sendmail(self, mx_hosts, mail_from, content):
+    def deliver(self, mailfrom, content):
         last_error = RuntimeError('no mx hosts to send email to')
-        for mx_host in mx_hosts:
+        mx_hosts = sorted((r.preference, r.exchange.to_text()) for r in resolver.query(forward_to_host, 'MX'))
+        for _, mx_host in mx_hosts:
             try:
-                with smtplib.SMTP_SSL(mx_host, forward_port) as smtp:
-                    smtp.sendmail(mail_from, [forward_to], content)
-            except smtplib.SMTPRecipientsRefused:
-                # all mail was refused, but it got to the server
+                with smtplib.SMTP(mx_host, 25, timeout=10) as smtp:
+                    smtp.sendmail(mailfrom, [forward_to], content)
+                # with smtplib.SMTP_SSL(*self._remoteaddr, timeout=5) as smtp:
+                #     smtp.sendmail(mailfrom, [forward_to], content)
+            except smtplib.SMTPRecipientsRefused as e:
+                logger.warning('SMTPRecipientsRefused: %s', e.recipients)
                 return
             except Exception as e:
+                logger.info('error with host %s, %s: %s', mx_host, e.__class__.__name__, e)
                 last_error = e
             else:
                 # send succeeded
@@ -87,16 +75,10 @@ class Handler:
 
 
 if __name__ == '__main__':
-    handler = Handler()
-    port = int(os.getenv('PORT') or 25)
-    logger.info('starting SMTP server on %s, forwarding to %s', port, forward_to)
-    controller = Controller(handler, hostname='0.0.0.0', port=port)
-    controller.start()
-
-    loop = asyncio.get_event_loop()
+    local_port = int(os.getenv('PORT') or 25)
+    print(f'starting SMTP server on {local_port}, forwarding to {forward_to}')
+    server = SMTPServer(('0.0.0.0', local_port), None)
     try:
-        loop.run_forever()
+        asyncore.loop()
     except KeyboardInterrupt:
         pass
-    finally:
-        controller.stop()

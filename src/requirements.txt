@@ -1,5 +1,2 @@
-aiodns==1.1.1
-aiosmtpd==1.2
-async-timeout==3.0.1
-devtools==0.3
+dnspython==1.16.0
 sentry-sdk==0.6.2

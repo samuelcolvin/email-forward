@@ -8,7 +8,6 @@ import smtpd
 import smtplib
 import re
 import ssl
-import traceback
 from pathlib import Path
 
 import sentry_sdk
@@ -71,34 +70,33 @@ class TLSSMTPChannel(smtpd.SMTPChannel):
             self.push('250-SMTPUTF8')
             self.command_size_limits['MAIL'] += 10
         self.push('250 HELP')
-        # if arg and not self.seen_greeting and not isinstance(self.conn, ssl.SSLSocket):
-        if not isinstance(self.conn, ssl.SSLSocket):
-            self.push('250-STARTTLS')
 
     def smtp_STARTTLS(self, arg):
-        try:
-            if arg:
-                self.push('501 Syntax error (no parameters allowed)')
-            elif not isinstance(self.conn, ssl.SSLSocket):
-                self.push('220 Ready to start TLS')
-                self.conn.settimeout(30)
-                self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
-                self.conn.settimeout(None)
-                # re-init channel
-                asynchat.async_chat.__init__(self, self.conn, self._map)
-                self.received_lines = []
-                self.smtp_state = self.COMMAND
-                self.seen_greeting = 0
-                self.mailfrom = None
-                self.rcpttos = []
-                self.received_data = ''
-                logger.debug('peer: %r - negotiated TLS: %r', self.addr, self.conn.cipher())
-            else:
-                self.push('454 TLS not available due to temporary reason')
-        except Exception as e:
-            logger.exception('error on STARTTLS: %s', e)
-            traceback.print_exc()
-            raise
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_extra('conn', self.conn)
+            scope.set_extra('addr', self.addr)
+            try:
+                if arg:
+                    self.push('501 Syntax error (no parameters allowed)')
+                elif not isinstance(self.conn, ssl.SSLSocket):
+                    self.push('220 Ready to start TLS')
+                    self.conn.settimeout(30)
+                    self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
+                    self.conn.settimeout(None)
+                    # re-init channel
+                    asynchat.async_chat.__init__(self, self.conn, self._map)
+                    self.received_lines = []
+                    self.smtp_state = self.COMMAND
+                    self.seen_greeting = 0
+                    self.mailfrom = None
+                    self.rcpttos = []
+                    self.received_data = ''
+                    logger.debug('peer %r negotiated TLS: %r', self.addr, self.conn.cipher())
+                else:
+                    self.push('454 TLS not available due to temporary reason')
+            except Exception as e:
+                logger.exception('error on STARTTLS: %s', e)
+                raise
 
 
 class SMTPServer(smtpd.SMTPServer):
@@ -108,6 +106,8 @@ class SMTPServer(smtpd.SMTPServer):
         super().__init__(*args, **kwargs)
         self.ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.ssl_ctx.load_cert_chain(certfile=str(ssl_crt_file), keyfile=str(ssl_key_file))
+        self.ssl_ctx.check_hostname = False
+        self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
     def handle_accepted(self, conn, addr):
         logger.info('incoming connection from %s:%s', *addr)
@@ -137,7 +137,6 @@ class SMTPServer(smtpd.SMTPServer):
                 self.deliver(mailfrom, content)
             except Exception:
                 logger.exception('error forwarding "%s" > %s', mailfrom, rcpttos)
-                traceback.print_exc()
 
     def deliver(self, mailfrom, content):
         last_error = RuntimeError('no mx hosts to send email to')

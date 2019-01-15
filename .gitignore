@@ -3,3 +3,4 @@
 /env/
 /src/config.toml
 /ssl.*
+__pycache__/

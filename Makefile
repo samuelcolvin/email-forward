@@ -28,18 +28,16 @@ create-host: aws-whoami
 		email-forward
 
 .PHONY: build
-build: C=$(shell git rev-parse HEAD)
-build: BT="$(shell date)"
-build: BUILD_ARGS=--build-arg COMMIT=$(C) --build-arg BUILD_TIME=$(BT)
+build: COMMIT=$(shell git rev-parse --short HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
 build:
 	docker build src/ -f src/Dockerfile.base -t email-forward-base
-	docker build src/ -t samuelcolvin/email-forward $(BUILD_ARGS)
+	docker build src/ -t samuelcolvin/email-forward --build-arg COMMIT=$(COMMIT)
 
 .PHONY: run-local
 run-local: SSL_CRT=$(shell cat ssl.crt | base64)
 run-local: SSL_KEY=$(shell cat ssl.key | base64)
 run-local: build
-	@echo "docker run -p=8025:8025 ...samuelcolvin/email-forward"
+	@echo "docker run -p=8025:8025 ... samuelcolvin/email-forward"
 	@docker run \
 	-it \
 	--rm=true \
@@ -47,6 +45,7 @@ run-local: build
 	-e "SSL_CRT=$(SSL_CRT)" \
 	-e "SSL_KEY=$(SSL_KEY)" \
 	-e "FORWARD_TO=$(FORWARD_TO)" \
+	-e "FORWARDED_DOMAINS=$(FORWARDED_DOMAINS)" \
 	--name email-forward-test \
 	samuelcolvin/email-forward
 
@@ -55,18 +54,17 @@ push: build
 	docker push samuelcolvin/email-forward
 
 .PHONY: deploy
-deploy: COMMIT=$(shell git rev-parse HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
+deploy: COMMIT=$(shell git rev-parse --short HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
 deploy: SSL_CRT=$(shell cat ssl.crt | base64)
 deploy: SSL_KEY=$(shell cat ssl.key | base64)
 deploy:
 	docker pull samuelcolvin/email-forward:latest
 	docker stop email-forward && docker rm email-forward || true
-	@echo "docker run -p=25:8025 ...samuelcolvin/email-forward"
+	@echo "docker run -p=25:8025 ... samuelcolvin/email-forward"
 	@docker run -d \
 		-p=25:8025 \
 		--restart unless-stopped \
 		-e "FORWARD_TO=$(FORWARD_TO)" \
-		-e "COMMIT=$(COMMIT)" \
 		-e "FORWARDED_DOMAINS=$(FORWARDED_DOMAINS)" \
 		-e "SENTRY_DSN=$(SENTRY_DSN)" \
 		-e "SSL_CRT=$(SSL_CRT)" \

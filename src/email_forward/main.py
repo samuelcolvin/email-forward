@@ -32,6 +32,8 @@ if not ssl_key_file.exists():
 
 s3 = boto3.resource('s3')
 s3_bucket = os.environ.get('AWS_BUCKET_NAME')
+forward_failure = '451 temporarily unable to forward email'
+hostname = os.getenv('HOST_NAME')
 
 
 class SMTPServer(smtpd.SMTPServer):
@@ -48,22 +50,18 @@ class SMTPServer(smtpd.SMTPServer):
         self.ssl_ctx.check_hostname = False
         self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    def handle_accepted(self, conn, addr):
-        logger.info('incoming connection from %s:%s', *addr)
-        super().handle_accepted(conn, addr)
-
     @with_sentry
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
         logger.info('forwarding "%s" > %s', mailfrom, ', '.join(rcpttos))
         if self.allow_address(*rcpttos):
             try:
-                self.send_email(peer, mailfrom, data)
+                return self.forward_email(peer, mailfrom, data)
             finally:
                 self.record_s3(mailfrom, data)
         else:
             logger.warning('forwarding not permitted for any of %s', rcpttos)
 
-    def send_email(self, peer, mailfrom, data):
+    def forward_email(self, peer, mailfrom, data):
         lines = data.splitlines(keepends=True)
         # Look for the last header
         i = 0
@@ -73,20 +71,21 @@ class SMTPServer(smtpd.SMTPServer):
                 ending = line
                 break
             i += 1
-        peer = peer[0].encode('ascii')
-        lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
+        peer_address = peer[0].encode('ascii')
+        lines.insert(i, b'X-Peer: %s%s' % (peer_address, ending))
         content = b''.join(lines)
 
         send_error = None
         mx_hosts = sorted((r.preference, r.exchange.to_text()) for r in resolver.query(forward_to_host, 'MX'))
         for _, mx_host in mx_hosts:
             try:
-                with smtplib.SMTP(mx_host, 25, timeout=10) as smtp:
+                with smtplib.SMTP(mx_host, 25, local_hostname=hostname, timeout=10) as smtp:
                     smtp.starttls()
                     smtp.sendmail(mailfrom, [forward_to], content)
             except smtplib.SMTPException as e:
-                logger.warning('%s on %s, not trying further hosts', e.__class__.__name__, mx_host)
-                return
+                logger.warning('SMTP error with host %s %s: %s (not trying further)',
+                               mx_host, e.__class__.__name__, e, exc_info=True)
+                return forward_failure
             except Exception as e:
                 logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
                 send_error = send_error or e
@@ -94,8 +93,8 @@ class SMTPServer(smtpd.SMTPServer):
                 # send succeeded
                 return
             sleep(1)
-        assert send_error, 'no MX hosts found to send email to'
-        raise send_error
+        logger.error('error while forwarding email', exc_info=send_error, extra={'mx_hosts': mx_hosts})
+        return forward_failure
 
     def record_s3(self, mailfrom, data):
         if s3_bucket:

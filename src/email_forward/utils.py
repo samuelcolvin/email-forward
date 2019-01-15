@@ -40,6 +40,9 @@ def with_sentry(f):
 class TLSChannel(smtpd.SMTPChannel):
     @with_sentry
     def smtp_RCPT(self, arg):
+        """
+        unchanged from super method, except where noted
+        """
         if not self.seen_greeting:
             self.push('503 Error: send HELO first')
             return
@@ -85,7 +88,7 @@ class TLSChannel(smtpd.SMTPChannel):
     @with_sentry
     def smtp_EHLO(self, arg):
         """
-        unchanged from super method, except for 250-STARTTLS lines
+        unchanged from super method, except where noted
         """
         if not arg:
             self.push('501 Syntax: EHLO hostname')
@@ -100,6 +103,7 @@ class TLSChannel(smtpd.SMTPChannel):
         self.push('250-%s' % self.fqdn)
 
         # changed {
+        logger.info('EHLO from %s %s:%s', self.seen_greeting, *self.addr)
         if not isinstance(self.conn, ssl.SSLSocket):
             self.push('250-STARTTLS')
         # }
@@ -113,6 +117,12 @@ class TLSChannel(smtpd.SMTPChannel):
             self.push('250-SMTPUTF8')
             self.command_size_limits['MAIL'] += 10
         self.push('250 HELP')
+
+    @with_sentry
+    def smtp_HELO(self, arg):
+        super().smtp_HELO(arg)
+        if self.seen_greeting:
+            logger.info('HELO from %s %s:%s', self.seen_greeting, *self.addr)
 
     @with_sentry
     def smtp_STARTTLS(self, arg):

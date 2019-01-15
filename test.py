@@ -31,9 +31,10 @@ def main():
     msg['To'] = f'{email}'
 
     print(f'connecting to mail server "{mx_host}"...')
-    with smtplib.SMTP(mx_host, port) as smtp:
+    with smtplib.SMTP(mx_host, port, local_hostname='testing.example.com') as smtp:
         print('noop:', smtp.noop())
         print('helo:', smtp.helo())
+        # print('ehlo:', smtp.ehlo())
         # print('mail:', smtp.mail('mail-server-test@example.com'))
         # print(f'rcpt ({email}):', smtp.rcpt(email))
         # print('rcpt (testing_example.com):', smtp.rcpt('testing_example.com'))

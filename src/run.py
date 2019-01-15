@@ -76,24 +76,29 @@ class TLSSMTPChannel(smtpd.SMTPChannel):
             self.push('250-STARTTLS')
 
     def smtp_STARTTLS(self, arg):
-        if arg:
-            self.push('501 Syntax error (no parameters allowed)')
-        elif not isinstance(self.conn, ssl.SSLSocket):
-            self.push('220 Ready to start TLS')
-            self.conn.settimeout(30)
-            self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
-            self.conn.settimeout(None)
-            # re-init channel
-            asynchat.async_chat.__init__(self, self.conn, self._map)
-            self.received_lines = []
-            self.smtp_state = self.COMMAND
-            self.seen_greeting = 0
-            self.mailfrom = None
-            self.rcpttos = []
-            self.received_data = ''
-            logger.debug('peer: %r - negotiated TLS: %r', self.addr, self.conn.cipher())
-        else:
-            self.push('454 TLS not available due to temporary reason')
+        try:
+            if arg:
+                self.push('501 Syntax error (no parameters allowed)')
+            elif not isinstance(self.conn, ssl.SSLSocket):
+                self.push('220 Ready to start TLS')
+                self.conn.settimeout(30)
+                self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
+                self.conn.settimeout(None)
+                # re-init channel
+                asynchat.async_chat.__init__(self, self.conn, self._map)
+                self.received_lines = []
+                self.smtp_state = self.COMMAND
+                self.seen_greeting = 0
+                self.mailfrom = None
+                self.rcpttos = []
+                self.received_data = ''
+                logger.debug('peer: %r - negotiated TLS: %r', self.addr, self.conn.cipher())
+            else:
+                self.push('454 TLS not available due to temporary reason')
+        except Exception as e:
+            logger.exception('error on STARTTLS: %s', e)
+            traceback.print_exc()
+            raise
 
 
 class SMTPServer(smtpd.SMTPServer):
@@ -130,9 +135,8 @@ class SMTPServer(smtpd.SMTPServer):
                 lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
                 content = b''.join(lines)
                 self.deliver(mailfrom, content)
-            except Exception as e:
-                logger.warning('forwarding "%s" > %s, error %s: %s', mailfrom, rcpttos, e.__class__.__name__, e)
-                sentry_sdk.capture_exception(e)
+            except Exception:
+                logger.exception('error forwarding "%s" > %s', mailfrom, rcpttos)
                 traceback.print_exc()
 
     def deliver(self, mailfrom, content):

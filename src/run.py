@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.7
 import asyncore
 import asynchat
+import base64
 import os
 import logging
 import smtpd
@@ -30,11 +31,10 @@ _, forward_to_host = forward_to.split('@', 1)
 
 ssl_crt_file = Path('./ssl.crt')
 if not ssl_crt_file.exists():
-    ssl_crt_file.write_text(os.environ['SSL_CRT'])
-
+    ssl_crt_file.write_text(base64.b64decode(os.environ['SSL_CRT'].encode()).decode())
 ssl_key_file = Path('./ssl.key')
 if not ssl_key_file.exists():
-    ssl_key_file.write_text(os.environ['SSL_KEY'])
+    ssl_key_file.write_text(base64.b64decode(os.environ['SSL_KEY'].encode()).decode())
 
 
 class TLSSMTPChannel(smtpd.SMTPChannel):
@@ -91,7 +91,7 @@ class TLSSMTPChannel(smtpd.SMTPChannel):
             self.mailfrom = None
             self.rcpttos = []
             self.received_data = ''
-            logger.debug('Peer: %r - negotiated TLS: %r', self.addr, self.conn.cipher())
+            logger.debug('peer: %r - negotiated TLS: %r', self.addr, self.conn.cipher())
         else:
             self.push('454 TLS not available due to temporary reason')
 
@@ -105,7 +105,7 @@ class SMTPServer(smtpd.SMTPServer):
         self.ssl_ctx.load_cert_chain(certfile=str(ssl_crt_file), keyfile=str(ssl_key_file))
 
     def handle_accepted(self, conn, addr):
-        logger.info('Incoming connection from %s:%s', *addr)
+        logger.info('incoming connection from %s:%s', *addr)
         super().handle_accepted(conn, addr)
 
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):

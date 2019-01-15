@@ -36,16 +36,19 @@ build:
 	docker build src/ -t samuelcolvin/email-forward $(BUILD_ARGS)
 
 .PHONY: run-local
-run-local: SSL_CRT=$(cat ssl.crt)
-run-local: SSL_KEY=$(cat ssl.key)
+run-local: SSL_CRT=$(shell cat ssl.crt | base64)
+run-local: SSL_KEY=$(shell cat ssl.key | base64)
 run-local: build
-	docker run \
+	@echo "docker run -p=8025:8025 ...samuelcolvin/email-forward"
+	@docker run \
 	-it \
 	--rm=true \
 	-p=8025:8025 \
-    -e "SSL_CRT=$(SSL_CRT)" \
-    -e "SSL_KEY=$(SSL_KEY)" \
-	-e "FORWARD_TO=$(FORWARD_TO)" samuelcolvin/email-forward
+	-e "SSL_CRT=$(SSL_CRT)" \
+	-e "SSL_KEY=$(SSL_KEY)" \
+	-e "FORWARD_TO=$(FORWARD_TO)" \
+	--name email-forward-test \
+	samuelcolvin/email-forward
 
 .PHONY: push
 push: build
@@ -53,12 +56,13 @@ push: build
 
 .PHONY: deploy
 deploy: COMMIT=$(shell git rev-parse HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
-deploy: SSL_CRT=$(cat ssl.crt)
-deploy: SSL_KEY=$(cat ssl.key)
+deploy: SSL_CRT=$(shell cat ssl.crt | base64)
+deploy: SSL_KEY=$(shell cat ssl.key | base64)
 deploy:
 	docker pull samuelcolvin/email-forward:latest
 	docker stop email-forward && docker rm email-forward || true
-	docker run -d -p=25:8025 --restart unless-stopped \
+	@echo "docker run -p=25:8025 ...samuelcolvin/email-forward"
+	@docker run -d -p=25:8025 --restart unless-stopped \
 		-e "HOST_NAME=$(HOST_NAME)" \
 		-e "FORWARD_TO=$(FORWARD_TO)" \
 		-e "COMMIT=$(COMMIT)" \

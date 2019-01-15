@@ -30,6 +30,7 @@ create-host: aws-whoami
 .PHONY: build
 build: COMMIT=$(shell git rev-parse --short HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
 build:
+	@rm -r src/email_forward/__pycache__ || true
 	docker build src/ -f src/Dockerfile.base -t email-forward-base
 	docker build src/ -t samuelcolvin/email-forward --build-arg COMMIT=$(COMMIT)
 

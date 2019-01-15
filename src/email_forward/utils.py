@@ -1,5 +1,4 @@
 import asynchat
-import os
 import logging
 import smtpd
 import ssl

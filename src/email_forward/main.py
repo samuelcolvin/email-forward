@@ -8,6 +8,7 @@ import re
 import ssl
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 
 import boto3
 from dns import resolver
@@ -76,7 +77,7 @@ class SMTPServer(smtpd.SMTPServer):
         lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
         content = b''.join(lines)
 
-        last_error = RuntimeError('no mx hosts to send email to')
+        send_error = None
         mx_hosts = sorted((r.preference, r.exchange.to_text()) for r in resolver.query(forward_to_host, 'MX'))
         for _, mx_host in mx_hosts:
             try:
@@ -84,15 +85,17 @@ class SMTPServer(smtpd.SMTPServer):
                     smtp.starttls()
                     smtp.sendmail(mailfrom, [forward_to], content)
             except smtplib.SMTPException as e:
-                logger.warning('%s on %s, not trying further hosts', e.__class__.__name__, mx_host, exc_info=True)
+                logger.warning('%s on %s, not trying further hosts', e.__class__.__name__, mx_host)
                 return
             except Exception as e:
-                logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e, exc_info=True)
-                last_error = e
+                logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
+                send_error = send_error or e
             else:
                 # send succeeded
                 return
-        raise last_error
+            sleep(1)
+        assert send_error, 'no MX hosts found to send email to'
+        raise send_error
 
     def record_s3(self, mailfrom, data):
         if s3_bucket:

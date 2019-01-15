@@ -62,14 +62,19 @@ deploy:
 	docker pull samuelcolvin/email-forward:latest
 	docker stop email-forward && docker rm email-forward || true
 	@echo "docker run -p=25:8025 ...samuelcolvin/email-forward"
-	@docker run -d -p=25:8025 --restart unless-stopped \
-		-e "HOST_NAME=$(HOST_NAME)" \
+	@docker run -d \
+		-p=25:8025 \
+		--restart unless-stopped \
 		-e "FORWARD_TO=$(FORWARD_TO)" \
 		-e "COMMIT=$(COMMIT)" \
 		-e "FORWARDED_DOMAINS=$(FORWARDED_DOMAINS)" \
 		-e "SENTRY_DSN=$(SENTRY_DSN)" \
 		-e "SSL_CRT=$(SSL_CRT)" \
 		-e "SSL_KEY=$(SSL_KEY)" \
+		-e "AWS_DEFAULT_REGION=$(AWS_DEFAULT_REGION)" \
+		-e "AWS_BUCKET_NAME=$(AWS_BUCKET_NAME)" \
+		-e "AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)" \
+		-e "AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)" \
 		--log-driver=awslogs \
 		--log-opt awslogs-region=eu-west-1 \
 		--log-opt awslogs-group=EmailForward \

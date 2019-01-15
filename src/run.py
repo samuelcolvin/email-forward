@@ -4,12 +4,15 @@ import asynchat
 import base64
 import os
 import logging
+import secrets
 import smtpd
 import smtplib
 import re
 import ssl
+from datetime import datetime
 from pathlib import Path
 
+import boto3
 import sentry_sdk
 from dns import resolver
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -35,11 +38,12 @@ ssl_key_file = Path('./ssl.key')
 if not ssl_key_file.exists():
     ssl_key_file.write_text(base64.b64decode(os.environ['SSL_KEY'].encode()).decode())
 
+allowed_domains = set(filter(None, os.getenv('FORWARDED_DOMAINS', '').split(',')))
+s3 = boto3.resource('s3')
+s3_bucket = os.environ.get('AWS_BUCKET_NAME')
 
-class TLSSMTPChannel(smtpd.SMTPChannel):
-    """
-    Roughly from https://github.com/tintinweb/python-smtpd-tls/blob/master/smtpd_tls.py
-    """
+
+class TLSChannel(smtpd.SMTPChannel):
     def smtp_EHLO(self, arg):
         """
         unchanged from super method, except for 250-STARTTLS lines
@@ -98,9 +102,16 @@ class TLSSMTPChannel(smtpd.SMTPChannel):
                 logger.exception('error on STARTTLS: %s', e)
                 raise
 
+    def recv(self, buffer_size):
+        # so recv with an ssl connection raises the same errors as without
+        try:
+            return super().recv(buffer_size)
+        except ssl.SSLWantReadError:
+            raise BlockingIOError()
+
 
 class SMTPServer(smtpd.SMTPServer):
-    channel_class = TLSSMTPChannel
+    channel_class = TLSChannel
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,25 +131,32 @@ class SMTPServer(smtpd.SMTPServer):
             scope.set_extra('rcpttos', rcpttos)
             scope.set_extra('data', data)
             scope.set_extra('kwargs', kwargs)
-            logger.info('forwarding "%s" > %s', mailfrom, rcpttos)
+            logger.info('forwarding "%s" > %s', mailfrom, ', '.join(rcpttos))
             try:
-                lines = data.splitlines(keepends=True)
-                # Look for the last header
-                i = 0
-                ending = b'\r\n'
-                for line in lines:
-                    if re.match(br'\r\n|\r|\n', line):
-                        ending = line
-                        break
-                    i += 1
-                peer = peer[0].encode('ascii')
-                lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
-                content = b''.join(lines)
-                self.deliver(mailfrom, content)
+                if any(r.split('@', 1)[1] in allowed_domains for r in rcpttos):
+                    try:
+                        self.send_email(peer, mailfrom, rcpttos, data)
+                    finally:
+                        self.record_s3(mailfrom, data)
+                else:
+                    logger.warning('ignored, no allowed domains')
             except Exception:
-                logger.exception('error forwarding "%s" > %s', mailfrom, rcpttos)
+                logger.exception('error forwarding "%s" > %s', mailfrom, ', '.join(rcpttos))
 
-    def deliver(self, mailfrom, content):
+    def send_email(self, peer, mailfrom, rcpttos, data):
+        lines = data.splitlines(keepends=True)
+        # Look for the last header
+        i = 0
+        ending = b'\r\n'
+        for line in lines:
+            if re.match(br'\r\n|\r|\n', line):
+                ending = line
+                break
+            i += 1
+        peer = peer[0].encode('ascii')
+        lines.insert(i, b'X-Peer: %s%s' % (peer, ending))
+        content = b''.join(lines)
+
         last_error = RuntimeError('no mx hosts to send email to')
         mx_hosts = sorted((r.preference, r.exchange.to_text()) for r in resolver.query(forward_to_host, 'MX'))
         for _, mx_host in mx_hosts:
@@ -150,12 +168,20 @@ class SMTPServer(smtpd.SMTPServer):
                 logger.warning('SMTPRecipientsRefused: %s', e.recipients)
                 return
             except Exception as e:
-                logger.info('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
+                logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
                 last_error = e
             else:
                 # send succeeded
                 return
         raise last_error
+
+    def record_s3(self, mailfrom, data):
+        if s3_bucket:
+            n = datetime.utcnow()
+            key = f'{n:%Y-%m}/{n:%Y-%m-%dT%H-%M-%S}_{mailfrom}_{secrets.token_hex(5)}.msg'
+            s3.Bucket(s3_bucket).put_object(Key=key, Body=data)
+        else:
+            logger.warning('s3_bucket not set, not saving to S3')
 
 
 if __name__ == '__main__':

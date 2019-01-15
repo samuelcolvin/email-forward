@@ -1,2 +1,6 @@
-.idea
-env.sh
+/.idea/
+/activate.sh
+/env/
+/src/config.toml
+/ssl.*
+__pycache__/

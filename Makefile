@@ -36,9 +36,16 @@ build:
 	docker build src/ -t samuelcolvin/email-forward $(BUILD_ARGS)
 
 .PHONY: run-local
-build: C=$(shell git rev-parse HEAD)
+run-local: SSL_CRT=$(cat ssl.crt)
+run-local: SSL_KEY=$(cat ssl.key)
 run-local: build
-	docker run -it --rm=true -p=8025:25 -e "FORWARD_TO=$(FORWARD_TO)" samuelcolvin/email-forward
+	docker run \
+	-it \
+	--rm=true \
+	-p=8025:8025 \
+    -e "SSL_CRT=$(SSL_CRT)" \
+    -e "SSL_KEY=$(SSL_KEY)" \
+	-e "FORWARD_TO=$(FORWARD_TO)" samuelcolvin/email-forward
 
 .PHONY: push
 push: build
@@ -46,15 +53,19 @@ push: build
 
 .PHONY: deploy
 deploy: COMMIT=$(shell git rev-parse HEAD)-$(shell date +%Y-%m-%dT%Hh%Mm%Ss)
+deploy: SSL_CRT=$(cat ssl.crt)
+deploy: SSL_KEY=$(cat ssl.key)
 deploy:
 	docker pull samuelcolvin/email-forward:latest
 	docker stop email-forward && docker rm email-forward || true
-	docker run -d -p=25:25 -p=465:465 -p=587:587 --restart unless-stopped \
+	docker run -d -p=25:8025 --restart unless-stopped \
 		-e "HOST_NAME=$(HOST_NAME)" \
 		-e "FORWARD_TO=$(FORWARD_TO)" \
-		-e "FORWARD_PASSWORD=$(FORWARD_PASSWORD)" \
+		-e "COMMIT=$(COMMIT)" \
 		-e "FORWARDED_DOMAINS=$(FORWARDED_DOMAINS)" \
 		-e "SENTRY_DSN=$(SENTRY_DSN)" \
+		-e "SSL_CRT=$(SSL_CRT)" \
+		-e "SSL_KEY=$(SSL_KEY)" \
 		--log-driver=awslogs \
 		--log-opt awslogs-region=eu-west-1 \
 		--log-opt awslogs-group=EmailForward \

@@ -2,3 +2,4 @@
 /activate.sh
 /env/
 /src/config.toml
+/ssl.*

@@ -16,7 +16,4 @@ COPY --from=base /usr/local/lib/python3.7/site-packages /usr/local/lib/python3.7
 
 ADD ./run.py /home/root
 
-ARG COMMIT
-ENV COMMIT $COMMIT
-
 CMD ["./run.py"]

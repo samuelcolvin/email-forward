@@ -103,8 +103,8 @@ class TLSChannel(smtpd.SMTPChannel):
         self.push('250-%s' % self.fqdn)
 
         # changed {
-        logger.info('EHLO from %s %s:%s', self.seen_greeting, *self.addr)
         if not isinstance(self.conn, ssl.SSLSocket):
+            logger.info('EHLO from %s %s:%s', self.seen_greeting, *self.addr)
             self.push('250-STARTTLS')
         # }
 
@@ -121,7 +121,7 @@ class TLSChannel(smtpd.SMTPChannel):
     @with_sentry
     def smtp_HELO(self, arg):
         super().smtp_HELO(arg)
-        if self.seen_greeting:
+        if self.seen_greeting and not isinstance(self.conn, ssl.SSLSocket):
             logger.info('HELO from %s %s:%s', self.seen_greeting, *self.addr)
 
     @with_sentry

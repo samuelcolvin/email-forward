@@ -32,7 +32,6 @@ if not ssl_key_file.exists():
 
 s3 = boto3.resource('s3')
 s3_bucket = os.environ.get('AWS_BUCKET_NAME')
-forward_failure = '451 temporarily unable to forward email'
 hostname = os.getenv('HOST_NAME')
 
 
@@ -82,19 +81,19 @@ class SMTPServer(smtpd.SMTPServer):
                 with smtplib.SMTP(mx_host, 25, local_hostname=hostname, timeout=10) as smtp:
                     smtp.starttls()
                     smtp.sendmail(mailfrom, [forward_to], content)
-            except smtplib.SMTPException as e:
-                logger.warning('SMTP error with host %s %s: %s (not trying further)',
-                               mx_host, e.__class__.__name__, e, exc_info=True)
-                return forward_failure
+            except smtplib.SMTPResponseException as e:
+                status = f'{e.smtp_code} {e.smtp_error.decode()}'
+                logger.warning('SMTP error with host %s: %s', mx_host, status, exc_info=True)
+                return status
             except Exception as e:
-                logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
+                logger.warning('error with host %s %s: %s (retrying)', mx_host, e.__class__.__name__, e)
                 send_error = send_error or e
             else:
                 # send succeeded
                 return
             sleep(1)
         logger.error('error while forwarding email', exc_info=send_error, extra={'mx_hosts': mx_hosts})
-        return forward_failure
+        return '451 temporarily unable to forward email'
 
     def record_s3(self, mailfrom, data):
         if s3_bucket:

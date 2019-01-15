@@ -32,6 +32,7 @@ def main():
 
     print(f'connecting to mail server "{mx_host}"...')
     with smtplib.SMTP(mx_host, port, local_hostname='testing.example.com') as smtp:
+        print('starttls:', smtp.starttls())
         print('noop:', smtp.noop())
         print('helo:', smtp.helo())
         # print('ehlo:', smtp.ehlo())

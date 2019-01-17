@@ -70,7 +70,8 @@ class SMTPServer(smtpd.SMTPServer):
                 response = self.forward_email(peer, mailfrom, data)
             else:
                 return '454 forwarding not permitted'
-            logger.info('%s > %s, ssl: %r, response: "%s"', msg_ref, ', '.join(rcpttos), self.start_ssl, response)
+            logger.info('msg-ref=%s rcpt=%s size=%d ssl=%r response="%s"',
+                        msg_ref, ', '.join(rcpttos), len(data), self.start_ssl, response)
             return response
         finally:
             self.record_s3(msg_id, data)

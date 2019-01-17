@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
+import os
 import smtplib
 import sys
 from email.mime.text import MIMEText
 
 
 def main():
-    try:
-        from dns import resolver
-    except ImportError:
-        resolver = None
-        return 'dnspython not installed, use `pip install dnspython`'
-
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         return 'wrong number of arguments, please provide email address'
 
     email = sys.argv[1]
-    mailbox, host = email.split('@', 1)
 
-    if host == 'localhost':
+    if len(sys.argv) > 2 and sys.argv[2] == 'local':
         mx_host = 'localhost'
         port = 8025
     else:
-        answers = list(resolver.query(host, 'MX'))
-        mx_host = answers[0].exchange.to_text()
+        mx_host = os.environ['HOST_NAME']
         port = 0
 
     msg = MIMEText('this is the message')

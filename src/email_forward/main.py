@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.7
 import base64
+import hashlib
 import os
 import secrets
 import smtpd
@@ -48,19 +49,33 @@ class SMTPServer(smtpd.SMTPServer):
         self.ssl_ctx.load_cert_chain(certfile=str(ssl_crt_file), keyfile=str(ssl_key_file))
         self.ssl_ctx.check_hostname = False
         self.ssl_ctx.verify_mode = ssl.CERT_NONE
+        self.start_ssl = False
+
+    def handle_accepted(self, conn, addr):
+        self.start_ssl = False
+        super().handle_accepted(conn, addr)
 
     @with_sentry
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
-        logger.info('forwarding "%s" > %s', mailfrom, ', '.join(rcpttos))
-        if self.allow_address(*rcpttos):
-            try:
-                return self.forward_email(peer, mailfrom, data)
-            finally:
-                self.record_s3(mailfrom, data)
+        m = re.search(b'^Message-ID: <(.+?)>', data, flags=re.M)
+        if m:
+            # use md5 so we get a unique id without it being 100 chars long
+            msg_id = hashlib.md5(m.group(1)).hexdigest()[:10]
         else:
-            logger.warning('forwarding not permitted for any of %s', rcpttos)
+            msg_id = 'unknown-' + secrets.token_hex(5)
+        msg_ref = f'{mailfrom}-{msg_id}'
 
-    def forward_email(self, peer, mailfrom, data):
+        try:
+            if self.allow_address(*rcpttos):
+                response = self.forward_email(peer, mailfrom, data)
+            else:
+                return '454 forwarding not permitted'
+            logger.info('%s > %s, ssl: %r, response: "%s"', msg_ref, ', '.join(rcpttos), self.start_ssl, response)
+            return response
+        finally:
+            self.record_s3(msg_id, data)
+
+    def forward_email(self, peer, mailfrom, data) -> str:
         lines = data.splitlines(keepends=True)
         # Look for the last header
         i = 0
@@ -79,26 +94,30 @@ class SMTPServer(smtpd.SMTPServer):
         for _, mx_host in mx_hosts:
             try:
                 with smtplib.SMTP(mx_host, 25, local_hostname=hostname, timeout=10) as smtp:
-                    smtp.starttls()
+                    if self.start_ssl:
+                        # match behaviour of in coming connection
+                        smtp.starttls()
                     smtp.sendmail(mailfrom, [forward_to], content)
             except smtplib.SMTPResponseException as e:
                 status = f'{e.smtp_code} {e.smtp_error.decode()}'
-                logger.warning('SMTP error with host %s: %s', mx_host, status, exc_info=True)
+                # 421 is "unsolicited mail response", gmail replies with this regularly
+                if e.smtp_code != 421:
+                    logger.warning('%s SMTP response from %s: %s', e.smtp_code, mx_host, exc_info=True)
                 return status
             except Exception as e:
-                logger.warning('error with host %s %s: %s (retrying)', mx_host, e.__class__.__name__, e)
+                logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
                 send_error = send_error or e
             else:
                 # send succeeded
-                return
+                return '250 OK'
             sleep(1)
         logger.error('error while forwarding email', exc_info=send_error, extra={'mx_hosts': mx_hosts})
         return '451 temporarily unable to forward email'
 
-    def record_s3(self, mailfrom, data):
+    def record_s3(self, msg_ref, data):
         if s3_bucket:
             n = datetime.utcnow()
-            key = f'{n:%Y-%m}/{n:%Y-%m-%dT%H-%M-%S}_{mailfrom}_{secrets.token_hex(5)}.msg'
+            key = f'{n:%Y-%m}/{n:%Y-%m-%dT%H-%M-%S}_{msg_ref}.msg'
             s3.Bucket(s3_bucket).put_object(Key=key, Body=data)
         else:
             logger.warning('s3_bucket not set, not saving to S3')

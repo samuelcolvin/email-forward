@@ -104,7 +104,7 @@ class TLSChannel(smtpd.SMTPChannel):
 
         # changed {
         if not isinstance(self.conn, ssl.SSLSocket):
-            logger.info('EHLO from %s %s:%s', self.seen_greeting, *self.addr)
+            logger.info('EHLO from %s %s', self.seen_greeting, self.addr[0])
             self.push('250-STARTTLS')
         # }
 
@@ -122,7 +122,7 @@ class TLSChannel(smtpd.SMTPChannel):
     def smtp_HELO(self, arg):
         super().smtp_HELO(arg)
         if self.seen_greeting and not isinstance(self.conn, ssl.SSLSocket):
-            logger.info('HELO from %s %s:%s', self.seen_greeting, *self.addr)
+            logger.info('HELO from %s %s', self.seen_greeting, self.addr[0])
 
     @with_sentry
     def smtp_STARTTLS(self, arg):
@@ -133,6 +133,7 @@ class TLSChannel(smtpd.SMTPChannel):
             self.conn.settimeout(30)
             self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
             self.conn.settimeout(None)
+            self.smtp_server.start_ssl = True
             asynchat.async_chat.__init__(self, self.conn, self._map)
             # reset the channel after upgrading to tls
             self.received_lines = []

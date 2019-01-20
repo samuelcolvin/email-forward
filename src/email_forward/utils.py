@@ -13,10 +13,7 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(fmt='%(message)s'))
 logger.addHandler(handler)
 
-sentry_logging = LoggingIntegration(
-    level=logging.INFO,          # Capture info and above as breadcrumbs
-    event_level=logging.WARNING  # Send errors as events
-)
+sentry_logging = LoggingIntegration(level=logging.INFO, event_level=logging.WARNING)
 sentry_sdk.init(integrations=[sentry_logging])
 
 
@@ -24,8 +21,7 @@ def with_sentry(f):
     @wraps(f)
     def wrapper(self, *args, **kwargs):
         with sentry_sdk.configure_scope() as scope:
-            scope.set_extra('conn', getattr(self, 'conn', None))
-            scope.set_extra('addr', getattr(self, 'addr', None))
+            scope.set_extra('self', getattr(self, '__dict__', None))
             scope.set_extra('function', f.__name__)
             scope.set_extra('args', args)
             scope.set_extra('kwargs', kwargs)
@@ -63,6 +59,8 @@ class TLSChannel(smtpd.SMTPChannel):
         if not self.smtp_server.allow_address(address):
             self.push(f'454 "{address}" forwarding not permitted')
             logger.warning('forwarding not permitted for "%s"', address)
+            self._reset()
+            self.close()
             return
         # }
 
@@ -131,20 +129,29 @@ class TLSChannel(smtpd.SMTPChannel):
         elif not isinstance(self.conn, ssl.SSLSocket):
             self.push('220 Ready to start TLS')
             self.conn.settimeout(30)
-            self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
-            self.conn.settimeout(None)
-            self.smtp_server.start_ssl = True
-            asynchat.async_chat.__init__(self, self.conn, self._map)
-            # reset the channel after upgrading to tls
-            self.received_lines = []
-            self.smtp_state = self.COMMAND
-            self.seen_greeting = 0
-            self.mailfrom = None
-            self.rcpttos = []
-            self.received_data = ''
-            logger.debug('peer %r negotiated TLS: %r', self.addr, self.conn.cipher())
+            try:
+                self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
+            except ssl.SSLError as exc:
+                logger.warning('ssl error %s: %s', exc.__class__.__name__, exc, exc_info=True)
+                self._reset()
+                self.close()
+            else:
+                self.conn.settimeout(None)
+                self.smtp_server.start_ssl = True
+                asynchat.async_chat.__init__(self, self.conn, self._map)
+                # reset the channel after upgrading to tls
+                self._reset()
+                self.smtp_state = self.COMMAND
+                logger.debug('peer %r negotiated TLS: %r', self.addr, self.conn.cipher())
         else:
             self.push('454 TLS not available due to temporary reason')
+
+    def _reset(self):
+        self.received_lines = []
+        self.seen_greeting = 0
+        self.mailfrom = None
+        self.rcpttos = []
+        self.received_data = ''
 
     def recv(self, buffer_size):
         # so recv with an ssl connection raises the same errors as without

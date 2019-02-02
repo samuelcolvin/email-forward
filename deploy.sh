@@ -2,6 +2,11 @@
 set -e
 eval $(docker-machine env email-forward)
 
+if [[ -z "$FORWARDED_DOMAINS" ]]; then
+  echo '$FORWARDED_DOMAINS is not set, cannot continue'
+  exit 2
+fi
+
 VERSION="`git rev-parse --short HEAD`-`date +%Y-%m-%dT%Hh%Mm%Ss`"
 docker pull samuelcolvin/email-forward:latest
 docker ps

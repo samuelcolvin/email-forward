@@ -35,55 +35,6 @@ def with_sentry(f):
 
 class TLSChannel(smtpd.SMTPChannel):
     @with_sentry
-    def smtp_RCPT(self, arg):
-        """
-        unchanged from super method, except where noted
-        """
-        if not self.seen_greeting:
-            self.push('503 Error: send HELO first')
-            return
-        logger.debug('===> RCPT %s', arg)
-        if not self.mailfrom:
-            self.push('503 Error: need MAIL command')
-            return
-        syntaxerr = '501 Syntax: RCPT TO: <address>'
-        if self.extended_smtp:
-            syntaxerr += ' [SP <mail-parameters>]'
-        if arg is None:
-            self.push(syntaxerr)
-            return
-        arg = self._strip_command_keyword('TO:', arg)
-        address, params = self._getaddr(arg)
-
-        # changed {
-        if not self.smtp_server.allow_address(address):
-            self.push(f'454 "{address}" forwarding not permitted')
-            logger.warning('forwarding not permitted for "%s"', address)
-            self._reset()
-            self.close()
-            return
-        # }
-
-        if not address:
-            self.push(syntaxerr)
-            return
-        if not self.extended_smtp and params:
-            self.push(syntaxerr)
-            return
-        self.rcpt_options = params.upper().split()
-        params = self._getparams(self.rcpt_options)
-        if params is None:
-            self.push(syntaxerr)
-            return
-        # XXX currently there are no options we recognize.
-        if len(params.keys()) > 0:
-            self.push('555 RCPT TO parameters not recognized or not implemented')
-            return
-        self.rcpttos.append(address)
-        logger.debug('recips: %s', self.rcpttos)
-        self.push('250 OK')
-
-    @with_sentry
     def smtp_EHLO(self, arg):
         """
         unchanged from super method, except where noted

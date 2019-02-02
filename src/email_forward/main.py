@@ -68,10 +68,12 @@ class SMTPServer(smtpd.SMTPServer):
         try:
             if self.allow_address(*rcpttos):
                 response = self.forward_email(peer, mailfrom, data)
+                log = logger.info
             else:
-                return '454 forwarding not permitted'
-            logger.info('msg-ref=%s rcpt=%s size=%d ssl=%r response="%s"',
-                        msg_ref, ', '.join(rcpttos), len(data), self.start_ssl, response)
+                response = '454 forwarding not permitted'
+                log = logger.warning
+            log('msg-ref=%s rcpt=%s size=%d ssl=%r response="%s"',
+                msg_ref, ', '.join(rcpttos), len(data), self.start_ssl, response)
             return response
         finally:
             self.record_s3(msg_id, data)
@@ -103,7 +105,7 @@ class SMTPServer(smtpd.SMTPServer):
                 status = f'{e.smtp_code} {e.smtp_error.decode()}'
                 # 421 is "unsolicited mail response", gmail replies with this regularly
                 if e.smtp_code != 421:
-                    logger.warning('%s SMTP response from %s: %s', e.smtp_code, mx_host, exc_info=True)
+                    logger.warning('%s SMTP response from %s', e.smtp_code, mx_host, exc_info=True)
                 return status
             except Exception as e:
                 logger.warning('error with host %s %s: %s', mx_host, e.__class__.__name__, e)
@@ -125,4 +127,4 @@ class SMTPServer(smtpd.SMTPServer):
 
     @staticmethod
     def allow_address(*addresses):
-        return any(r.split('@', 1)[1] in allowed_domains for r in addresses)
+        return any(r.split('@', 1)[1].lower() in allowed_domains for r in addresses)

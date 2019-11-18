@@ -68,12 +68,10 @@ class SMTPServer(smtpd.SMTPServer):
         try:
             if self.allow_address(*rcpttos):
                 response = self.forward_email(peer, mailfrom, data)
-                log = logger.info
             else:
                 response = '454 forwarding not permitted'
-                log = logger.warning
-            log('msg-ref=%s rcpt=%s size=%d ssl=%r response="%s"',
-                msg_ref, ', '.join(rcpttos), len(data), self.start_ssl, response)
+            logger.info('msg-ref=%s rcpt=%s size=%d ssl=%r response="%s"',
+                        msg_ref, ', '.join(rcpttos), len(data), self.start_ssl, response)
             return response
         finally:
             self.record_s3(msg_id, data)
@@ -104,7 +102,9 @@ class SMTPServer(smtpd.SMTPServer):
             except smtplib.SMTPResponseException as e:
                 status = f'{e.smtp_code} {e.smtp_error.decode()}'
                 # 421 is "unsolicited mail response", gmail replies with this regularly
-                if e.smtp_code != 421:
+                # 550 is "5.7.1 Our system has detected that this message is likely
+                # suspicious due to the very low reputation of the sending", gmail replies with this regularly
+                if e.smtp_code not in {421, 550}:
                     logger.warning('%s SMTP response from %s', e.smtp_code, mx_host, exc_info=True)
                 return status
             except Exception as e:

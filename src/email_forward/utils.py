@@ -33,6 +33,12 @@ def with_sentry(f):
     return wrapper
 
 
+known_ssl_errors = (
+    'EOF occurred in violation of protocol',
+    '[SSL: WRONG_VERSION_NUMBER] wrong version number'
+)
+
+
 class TLSChannel(smtpd.SMTPChannel):
     @with_sentry
     def smtp_EHLO(self, arg):
@@ -83,7 +89,9 @@ class TLSChannel(smtpd.SMTPChannel):
             try:
                 self.conn = self.smtp_server.ssl_ctx.wrap_socket(self.conn, server_side=True)
             except ssl.SSLError as exc:
-                logger.warning('ssl error %s: %s', exc.__class__.__name__, exc, exc_info=True)
+                exc_str = str(exc)
+                if not any(known_error in exc_str for known_error in known_ssl_errors):
+                    logger.warning('ssl error %r', exc, exc_info=True)
                 self._reset()
                 self.close()
             else:
